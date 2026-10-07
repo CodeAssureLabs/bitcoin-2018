@@ -1,0 +1,98 @@
+schema_version: 1
+manifest_version: 2
+repo: CodeAssureLabs/bitcoin-2018
+# Snapshot manifest: the 2021 doc/design/libraries.md target applied retroactively; file->layer map from this
+# snapshot's src/Makefile.am library _SOURCES lists (pre-CMake). No libbitcoinkernel yet, so `data` is empty.
+# Transcription of doc/design/libraries.md ("Dependencies") onto CodeAssure's fixed layer vocabulary.
+# Library -> layer (file membership comes from the CMake add_library/target_sources lists, see resolved.json):
+#   bitcoind, bitcoin-qt, bitcoin-cli, bitcoin-wallet mains, init/  -> entry
+#   libbitcoinqt (src/qt)                                          -> api
+#   libbitcoin_node (+ zmq, ipc)                                   -> service
+#   libbitcoin_wallet (src/wallet)                                 -> integration  (node's isolated sibling)
+#   libbitcoinkernel                                               -> data
+#   libbitcoin_consensus                                           -> domain
+#   libbitcoin_common + src/interfaces                             -> config
+#   libbitcoin_util + libbitcoin_crypto (+ bundled libs)           -> utils (cross-cutting)
+# `integration` is used for the wallet only because the vocabulary is fixed: what matters is that node,
+# wallet and GUI sit in three different layers with no edge between them, so "never reference each
+# other's symbols; only call each other through src/interfaces" is enforced by absence.
+layers:
+  entry: [api, service, integration, data, domain, config]
+  api: [domain, config]            # GUI: no node, wallet or kernel; only interfaces/common/consensus
+  service: [data, domain, config]  # node: the only internal user of the kernel
+  integration: [domain, config]    # wallet: no node, no kernel ("GUI and wallet ... should not depend on libbitcoin_kernel")
+  data: [domain]                   # kernel: only consensus, crypto, util
+  domain: []                       # consensus: only crypto
+  config: [domain]                 # common: only util, consensus, crypto
+cross_cutting: [utils]             # util + crypto: depended on by everything, depend on nothing else
+forbidden_edges:
+  - id: kernel-only-consensus-crypto-util
+    from: data
+    to: service
+    reason: "libbitcoin_kernel should only depend on libbitcoin_util, libbitcoin_consensus and libbitcoin_crypto (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+  - id: wallet-no-kernel
+    from: integration
+    to: data
+    reason: "GUI and wallet libraries should not depend on libbitcoin_kernel and the block validation it pulls in (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+  - id: gui-no-kernel
+    from: api
+    to: data
+    reason: "GUI and wallet libraries should not depend on libbitcoin_kernel (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+  - id: node-wallet-gui-via-interfaces
+    from: service
+    to: integration
+    reason: "node, wallet and GUI must never reference each other's symbols; call through src/interfaces (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+  - id: wallet-not-node
+    from: integration
+    to: service
+    reason: "node, wallet and GUI must never reference each other's symbols; call through src/interfaces (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+  - id: gui-not-node-or-wallet
+    from: api
+    to: service
+    reason: "the GUI reaches node and wallet only through src/interfaces (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+  - id: common-no-node
+    from: config
+    to: service
+    reason: "libbitcoin_common should not depend on anything other than util, consensus and crypto (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+  - id: consensus-standalone
+    from: domain
+    to: data
+    reason: "libbitcoin_consensus should only depend on libbitcoin_crypto (doc/design/libraries.md)"
+    check: blocking
+    severity: high
+required_companions:
+  - id: rpc-needs-functional-test
+    when: "src/rpc/*.cpp"
+    require: ["test/functional/**/*.py"]
+    reason: "a new or changed RPC needs a functional test"
+    check: detect_only
+  - id: new-source-in-cmake
+    when: "src/**/*.cpp"
+    require: ["src/**/CMakeLists.txt"]
+    reason: "a new translation unit must be added to its library's CMakeLists.txt source list"
+    check: detect_only
+invariants:
+  - id: no-stdout-in-kernel
+    within: "src/kernel/**"
+    forbid_pattern: '\bstd::(cout|cerr)\b'
+    reason: "libbitcoinkernel logs through the logger, never stdout"
+    check: detect_only
+  - id: no-raw-thread-in-consensus
+    within: "src/consensus/**"
+    forbid_pattern: '\bstd::thread\b'
+    reason: "consensus code is single-threaded by contract"
+    check: detect_only
