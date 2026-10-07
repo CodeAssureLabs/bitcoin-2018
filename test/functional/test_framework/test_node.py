@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-# Copyright (c) 2017 The Bitcoin Core developers
+# Copyright (c) 2017-2018 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Class for bitcoind node under test"""
 
+import contextlib
 import decimal
 import errno
 from enum import Enum
@@ -15,6 +16,7 @@ import re
 import subprocess
 import tempfile
 import time
+import urllib.parse
 
 from .authproxy import JSONRPCException
 from .util import (
@@ -56,17 +58,13 @@ class TestNode():
     To make things easier for the test writer, any unrecognised messages will
     be dispatched to the RPC connection."""
 
-    def __init__(self, i, datadir, rpchost, timewait, bitcoind, bitcoin_cli, mocktime, coverage_dir, extra_conf=None, extra_args=None, use_cli=False):
+    def __init__(self, i, datadir, *, rpchost, timewait, bitcoind, bitcoin_cli, mocktime, coverage_dir, extra_conf=None, extra_args=None, use_cli=False):
         self.index = i
         self.datadir = datadir
         self.stdout_dir = os.path.join(self.datadir, "stdout")
         self.stderr_dir = os.path.join(self.datadir, "stderr")
         self.rpchost = rpchost
-        if timewait:
-            self.rpc_timeout = timewait
-        else:
-            # Wait for up to 60 seconds for the RPC server to respond
-            self.rpc_timeout = 60
+        self.rpc_timeout = timewait
         self.binary = bitcoind
         self.coverage_dir = coverage_dir
         if extra_conf != None:
@@ -125,7 +123,7 @@ class TestNode():
             assert self.rpc_connected and self.rpc is not None, self._node_msg("Error: no RPC connection")
             return getattr(self.rpc, name)
 
-    def start(self, extra_args=None, stdout=None, stderr=None, *args, **kwargs):
+    def start(self, extra_args=None, *, stdout=None, stderr=None, **kwargs):
         """Start the node."""
         if extra_args is None:
             extra_args = self.extra_args
@@ -146,7 +144,7 @@ class TestNode():
         # add environment variable LIBC_FATAL_STDERR_=1 so that libc errors are written to stderr and not the terminal
         subp_env = dict(os.environ, LIBC_FATAL_STDERR_="1")
 
-        self.process = subprocess.Popen(self.args + extra_args, env=subp_env, stdout=stdout, stderr=stderr, *args, **kwargs)
+        self.process = subprocess.Popen(self.args + extra_args, env=subp_env, stdout=stdout, stderr=stderr, **kwargs)
 
         self.running = True
         self.log.debug("bitcoind started, waiting for RPC to come up")
@@ -184,7 +182,7 @@ class TestNode():
             return self.cli("-rpcwallet={}".format(wallet_name))
         else:
             assert self.rpc_connected and self.rpc, self._node_msg("RPC not connected")
-            wallet_path = "wallet/%s" % wallet_name
+            wallet_path = "wallet/{}".format(urllib.parse.quote(wallet_name))
             return self.rpc / wallet_path
 
     def stop_node(self, expected_stderr=''):
@@ -202,6 +200,9 @@ class TestNode():
         stderr = self.stderr.read().decode('utf-8').strip()
         if stderr != expected_stderr:
             raise AssertionError("Unexpected stderr {} != {}".format(stderr, expected_stderr))
+
+        self.stdout.close()
+        self.stderr.close()
 
         del self.p2ps[:]
 
@@ -228,6 +229,23 @@ class TestNode():
 
     def wait_until_stopped(self, timeout=BITCOIND_PROC_WAIT_TIMEOUT):
         wait_until(self.is_node_stopped, timeout=timeout)
+
+    @contextlib.contextmanager
+    def assert_debug_log(self, expected_msgs):
+        debug_log = os.path.join(self.datadir, 'regtest', 'debug.log')
+        with open(debug_log, encoding='utf-8') as dl:
+            dl.seek(0, 2)
+            prev_size = dl.tell()
+        try:
+            yield
+        finally:
+            with open(debug_log, encoding='utf-8') as dl:
+                dl.seek(prev_size)
+                log = dl.read()
+            print_log = " - " + "\n - ".join(log.splitlines())
+            for expected_msg in expected_msgs:
+                if re.search(re.escape(expected_msg), log, flags=re.MULTILINE) is None:
+                    self._raise_assertion_error('Expected message "{}" does not partially match log:\n\n{}\n\n'.format(expected_msg, print_log))
 
     def assert_start_raises_init_error(self, extra_args=None, expected_msg=None, match=ErrorMatch.FULL_TEXT, *args, **kwargs):
         """Attempt to start the node and expect it to raise an error.
@@ -279,7 +297,7 @@ class TestNode():
         self.encryptwallet(passphrase)
         self.wait_until_stopped()
 
-    def add_p2p_connection(self, p2p_conn, *args, **kwargs):
+    def add_p2p_connection(self, p2p_conn, *, wait_for_verack=True, **kwargs):
         """Add a p2p connection to the node.
 
         This method adds the p2p connection to the self.p2ps list and also
@@ -289,8 +307,10 @@ class TestNode():
         if 'dstaddr' not in kwargs:
             kwargs['dstaddr'] = '127.0.0.1'
 
-        p2p_conn.peer_connect(*args, **kwargs)()
+        p2p_conn.peer_connect(**kwargs)()
         self.p2ps.append(p2p_conn)
+        if wait_for_verack:
+            p2p_conn.wait_for_verack()
 
         return p2p_conn
 

@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -235,12 +235,11 @@ bool AddLocal(const CNetAddr &addr, int nScore)
     return AddLocal(CService(addr, GetListenPort()), nScore);
 }
 
-bool RemoveLocal(const CService& addr)
+void RemoveLocal(const CService& addr)
 {
     LOCK(cs_mapLocalHost);
     LogPrintf("RemoveLocal(%s)\n", addr.ToString());
     mapLocalHost.erase(addr);
-    return true;
 }
 
 /** Make a particular network entirely off-limits (no automatic connects to it) */
@@ -345,7 +344,7 @@ CNode* CConnman::FindNode(const CService& addr)
 bool CConnman::CheckIncomingNonce(uint64_t nonce)
 {
     LOCK(cs_vNodes);
-    for (CNode* pnode : vNodes) {
+    for (const CNode* pnode : vNodes) {
         if (!pnode->fSuccessfullyConnected && !pnode->fInbound && pnode->GetLocalNonce() == nonce)
             return false;
     }
@@ -716,6 +715,7 @@ void CNode::copyStats(CNodeStats &stats)
         X(nRecvBytes);
     }
     X(fWhitelisted);
+    X(minFeeFilter);
 
     // It is common for nodes with good ping times to suddenly become lagged,
     // due to a new block arriving or other large transfer.
@@ -1163,6 +1163,17 @@ void CConnman::ThreadSocketHandler()
         //
         {
             LOCK(cs_vNodes);
+
+            if (!fNetworkActive) {
+                // Disconnect any connected nodes
+                for (CNode* pnode : vNodes) {
+                    if (!pnode->fDisconnect) {
+                        LogPrint(BCLog::NET, "Network not active, dropping peer=%d\n", pnode->GetId());
+                        pnode->fDisconnect = true;
+                    }
+                }
+            }
+
             // Disconnect unused nodes
             std::vector<CNode*> vNodesCopy = vNodes;
             for (CNode* pnode : vNodesCopy)
@@ -1216,7 +1227,7 @@ void CConnman::ThreadSocketHandler()
         if(vNodesSize != nPrevNodeCount) {
             nPrevNodeCount = vNodesSize;
             if(clientInterface)
-                clientInterface->NotifyNumConnectionsChanged(nPrevNodeCount);
+                clientInterface->NotifyNumConnectionsChanged(vNodesSize);
         }
 
         //
@@ -1603,7 +1614,7 @@ void CConnman::ThreadDNSAddressSeed()
 
         LOCK(cs_vNodes);
         int nRelevant = 0;
-        for (auto pnode : vNodes) {
+        for (const CNode* pnode : vNodes) {
             nRelevant += pnode->fSuccessfullyConnected && !pnode->fFeeler && !pnode->fOneShot && !pnode->m_manual_connection && !pnode->fInbound;
         }
         if (nRelevant >= 2) {
@@ -1722,7 +1733,7 @@ int CConnman::GetExtraOutboundCount()
     int nOutbound = 0;
     {
         LOCK(cs_vNodes);
-        for (CNode* pnode : vNodes) {
+        for (const CNode* pnode : vNodes) {
             if (!pnode->fInbound && !pnode->m_manual_connection && !pnode->fFeeler && !pnode->fDisconnect && !pnode->fOneShot && pnode->fSuccessfullyConnected) {
                 ++nOutbound;
             }
@@ -1788,12 +1799,11 @@ void CConnman::ThreadOpenConnections(const std::vector<std::string> connect)
         CAddress addrConnect;
 
         // Only connect out to one peer per network group (/16 for IPv4).
-        // Do this here so we don't have to critsect vNodes inside mapAddresses critsect.
         int nOutbound = 0;
         std::set<std::vector<unsigned char> > setConnected;
         {
             LOCK(cs_vNodes);
-            for (CNode* pnode : vNodes) {
+            for (const CNode* pnode : vNodes) {
                 if (!pnode->fInbound && !pnode->m_manual_connection) {
                     // Netgroups for inbound and addnode peers are not excluded because our goal here
                     // is to not use multiple of our limited outbound slots on a single netgroup
@@ -2055,7 +2065,7 @@ void CConnman::ThreadMessageHandler()
                 pnode->Release();
         }
 
-        std::unique_lock<std::mutex> lock(mutexMsgProc);
+        WAIT_LOCK(mutexMsgProc, lock);
         if (!fMoreWork) {
             condMsgProc.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(100), [this] { return fMsgProcWake; });
         }
@@ -2198,14 +2208,6 @@ void CConnman::SetNetworkActive(bool active)
 
     fNetworkActive = active;
 
-    if (!fNetworkActive) {
-        LOCK(cs_vNodes);
-        // Close sockets to all nodes
-        for (CNode* pnode : vNodes) {
-            pnode->CloseSocketDisconnect();
-        }
-    }
-
     uiInterface.NotifyNetworkActiveChanged(fNetworkActive);
 }
 
@@ -2345,7 +2347,7 @@ bool CConnman::Start(CScheduler& scheduler, const Options& connOptions)
     flagInterruptMsgProc = false;
 
     {
-        std::unique_lock<std::mutex> lock(mutexMsgProc);
+        LOCK(mutexMsgProc);
         fMsgProcWake = false;
     }
 

@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -72,7 +72,7 @@ BerkeleyEnvironment* GetWalletEnv(const fs::path& wallet_path, std::string& data
         database_filename = "wallet.dat";
     }
     LOCK(cs_db);
-    // Note: An ununsed temporary BerkeleyEnvironment object may be created inside the
+    // Note: An unused temporary BerkeleyEnvironment object may be created inside the
     // emplace function if the key already exists. This is a little inefficient,
     // but not a big concern since the map will be changed in the future to hold
     // pointers instead of objects, anyway.
@@ -503,7 +503,7 @@ BerkeleyBatch::BerkeleyBatch(BerkeleyDatabase& database, const char* pszMode, bo
             // be implemented, so no equality checks are needed at all. (Newer
             // versions of BDB have an set_lk_exclusive method for this
             // purpose, but the older version we use does not.)
-            for (auto& env : g_dbenvs) {
+            for (const auto& env : g_dbenvs) {
                 CheckUniqueFileid(env.second, strFilename, *pdb_temp);
             }
 
@@ -768,7 +768,7 @@ bool BerkeleyDatabase::Backup(const std::string& strDest)
                 env->mapFileUseCount.erase(strFile);
 
                 // Copy wallet file
-                fs::path pathSrc = GetWalletDir() / strFile;
+                fs::path pathSrc = env->Directory() / strFile;
                 fs::path pathDest(strDest);
                 if (fs::is_directory(pathDest))
                     pathDest /= strFile;

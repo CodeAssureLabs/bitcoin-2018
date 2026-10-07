@@ -96,6 +96,7 @@ BITCOIN_CORE_H = \
   bech32.h \
   bloom.h \
   blockencodings.h \
+  blockfilter.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -158,6 +159,7 @@ BITCOIN_CORE_H = \
   rpc/register.h \
   rpc/util.h \
   scheduler.h \
+  script/descriptor.h \
   script/ismine.h \
   script/sigcache.h \
   script/sign.h \
@@ -218,6 +220,7 @@ libbitcoin_server_a_SOURCES = \
   addrman.cpp \
   bloom.cpp \
   blockencodings.cpp \
+  blockfilter.cpp \
   chain.cpp \
   checkpoints.cpp \
   consensus/tx_verify.cpp \
@@ -274,6 +277,7 @@ libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_wallet_a_SOURCES = \
   interfaces/wallet.cpp \
+  wallet/coincontrol.cpp \
   wallet/crypter.cpp \
   wallet/db.cpp \
   wallet/feebumper.cpp \
@@ -386,6 +390,7 @@ libbitcoin_common_a_SOURCES = \
   policy/feerate.cpp \
   protocol.cpp \
   scheduler.cpp \
+  script/descriptor.cpp \
   script/ismine.cpp \
   script/sign.cpp \
   script/standard.cpp \

@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -20,6 +20,12 @@ class CTransaction;
 
 struct CMutableTransaction;
 
+struct KeyOriginInfo
+{
+    unsigned char fingerprint[4];
+    std::vector<uint32_t> path;
+};
+
 /** An interface to be implemented by keystores that support signing. */
 class SigningProvider
 {
@@ -28,20 +34,38 @@ public:
     virtual bool GetCScript(const CScriptID &scriptid, CScript& script) const { return false; }
     virtual bool GetPubKey(const CKeyID &address, CPubKey& pubkey) const { return false; }
     virtual bool GetKey(const CKeyID &address, CKey& key) const { return false; }
+    virtual bool GetKeyOrigin(const CKeyID& id, KeyOriginInfo& info) const { return false; }
 };
 
 extern const SigningProvider& DUMMY_SIGNING_PROVIDER;
 
-class PublicOnlySigningProvider : public SigningProvider
+class HidingSigningProvider : public SigningProvider
 {
 private:
+    const bool m_hide_secret;
+    const bool m_hide_origin;
     const SigningProvider* m_provider;
 
 public:
-    PublicOnlySigningProvider(const SigningProvider* provider) : m_provider(provider) {}
-    bool GetCScript(const CScriptID &scriptid, CScript& script) const;
-    bool GetPubKey(const CKeyID &address, CPubKey& pubkey) const;
+    HidingSigningProvider(const SigningProvider* provider, bool hide_secret, bool hide_origin) : m_hide_secret(hide_secret), m_hide_origin(hide_origin), m_provider(provider) {}
+    bool GetCScript(const CScriptID& scriptid, CScript& script) const override;
+    bool GetPubKey(const CKeyID& keyid, CPubKey& pubkey) const override;
+    bool GetKey(const CKeyID& keyid, CKey& key) const override;
+    bool GetKeyOrigin(const CKeyID& keyid, KeyOriginInfo& info) const override;
 };
+
+struct FlatSigningProvider final : public SigningProvider
+{
+    std::map<CScriptID, CScript> scripts;
+    std::map<CKeyID, CPubKey> pubkeys;
+    std::map<CKeyID, CKey> keys;
+
+    bool GetCScript(const CScriptID& scriptid, CScript& script) const override;
+    bool GetPubKey(const CKeyID& keyid, CPubKey& pubkey) const override;
+    bool GetKey(const CKeyID& keyid, CKey& key) const override;
+};
+
+FlatSigningProvider Merge(const FlatSigningProvider& a, const FlatSigningProvider& b);
 
 /** Interface for signature creators. */
 class BaseSignatureCreator {
@@ -67,8 +91,10 @@ public:
     bool CreateSig(const SigningProvider& provider, std::vector<unsigned char>& vchSig, const CKeyID& keyid, const CScript& scriptCode, SigVersion sigversion) const override;
 };
 
-/** A signature creator that just produces 72-byte empty signatures. */
+/** A signature creator that just produces 71-byte empty signatures. */
 extern const BaseSignatureCreator& DUMMY_SIGNATURE_CREATOR;
+/** A signature creator that just produces 72-byte empty signatures. */
+extern const BaseSignatureCreator& DUMMY_MAXIMUM_SIGNATURE_CREATOR;
 
 typedef std::pair<CPubKey, std::vector<unsigned char>> SigPair;
 
@@ -83,7 +109,7 @@ struct SignatureData {
     CScript witness_script; ///< The witnessScript (if any) for the input. witnessScripts are used in P2WSH outputs.
     CScriptWitness scriptWitness; ///< The scriptWitness of an input. Contains complete signatures or the traditional partial signatures format. scriptWitness is part of a transaction input per BIP 144.
     std::map<CKeyID, SigPair> signatures; ///< BIP 174 style partial signatures for the input. May contain all signatures necessary for producing a final scriptSig or scriptWitness.
-    std::map<CKeyID, CPubKey> misc_pubkeys;
+    std::map<CKeyID, std::pair<CPubKey, KeyOriginInfo>> misc_pubkeys;
 
     SignatureData() {}
     explicit SignatureData(const CScript& script) : scriptSig(script) {}
@@ -116,33 +142,31 @@ static constexpr uint8_t PSBT_OUT_BIP32_DERIVATION = 0x02;
 // as a 0 length key which indicates that this is the separator. The separator has no value.
 static constexpr uint8_t PSBT_SEPARATOR = 0x00;
 
-// Takes a stream and multiple arguments and serializes them into a vector and then into the stream
+// Takes a stream and multiple arguments and serializes them as if first serialized into a vector and then into the stream
 // The resulting output into the stream has the total serialized length of all of the objects followed by all objects concatenated with each other.
 template<typename Stream, typename... X>
 void SerializeToVector(Stream& s, const X&... args)
 {
-    std::vector<unsigned char> ret;
-    CVectorWriter ss(SER_NETWORK, PROTOCOL_VERSION, ret, 0);
-    SerializeMany(ss, args...);
-    s << ret;
+    WriteCompactSize(s, GetSerializeSizeMany(s, args...));
+    SerializeMany(s, args...);
 }
 
 // Takes a stream and multiple arguments and unserializes them first as a vector then each object individually in the order provided in the arguments
 template<typename Stream, typename... X>
 void UnserializeFromVector(Stream& s, X&... args)
 {
-    std::vector<unsigned char> data;
-    s >> data;
-    CDataStream ss(data, SER_NETWORK, PROTOCOL_VERSION);
-    UnserializeMany(ss, args...);
-    if (!ss.eof()) {
+    size_t expected_size = ReadCompactSize(s);
+    size_t remaining_before = s.size();
+    UnserializeMany(s, args...);
+    size_t remaining_after = s.size();
+    if (remaining_after + expected_size != remaining_before) {
         throw std::ios_base::failure("Size of value was not the stated size");
     }
 }
 
 // Deserialize HD keypaths into a map
 template<typename Stream>
-void DeserializeHDKeypaths(Stream& s, const std::vector<unsigned char>& key, std::map<CPubKey, std::vector<uint32_t>>& hd_keypaths)
+void DeserializeHDKeypaths(Stream& s, const std::vector<unsigned char>& key, std::map<CPubKey, KeyOriginInfo>& hd_keypaths)
 {
     // Make sure that the key is the size of pubkey + 1
     if (key.size() != CPubKey::PUBLIC_KEY_SIZE + 1 && key.size() != CPubKey::COMPRESSED_PUBLIC_KEY_SIZE + 1) {
@@ -159,25 +183,31 @@ void DeserializeHDKeypaths(Stream& s, const std::vector<unsigned char>& key, std
 
     // Read in key path
     uint64_t value_len = ReadCompactSize(s);
-    std::vector<uint32_t> keypath;
-    for (unsigned int i = 0; i < value_len; i += sizeof(uint32_t)) {
+    if (value_len % 4 || value_len == 0) {
+        throw std::ios_base::failure("Invalid length for HD key path");
+    }
+
+    KeyOriginInfo keypath;
+    s >> keypath.fingerprint;
+    for (unsigned int i = 4; i < value_len; i += sizeof(uint32_t)) {
         uint32_t index;
         s >> index;
-        keypath.push_back(index);
+        keypath.path.push_back(index);
     }
 
     // Add to map
-    hd_keypaths.emplace(pubkey, keypath);
+    hd_keypaths.emplace(pubkey, std::move(keypath));
 }
 
 // Serialize HD keypaths to a stream from a map
 template<typename Stream>
-void SerializeHDKeypaths(Stream& s, const std::map<CPubKey, std::vector<uint32_t>>& hd_keypaths, uint8_t type)
+void SerializeHDKeypaths(Stream& s, const std::map<CPubKey, KeyOriginInfo>& hd_keypaths, uint8_t type)
 {
     for (auto keypath_pair : hd_keypaths) {
         SerializeToVector(s, type, MakeSpan(keypath_pair.first));
-        WriteCompactSize(s, keypath_pair.second.size() * sizeof(uint32_t));
-        for (auto& path : keypath_pair.second) {
+        WriteCompactSize(s, (keypath_pair.second.path.size() + 1) * sizeof(uint32_t));
+        s << keypath_pair.second.fingerprint;
+        for (const auto& path : keypath_pair.second.path) {
             s << path;
         }
     }
@@ -192,7 +222,7 @@ struct PSBTInput
     CScript witness_script;
     CScript final_script_sig;
     CScriptWitness final_script_witness;
-    std::map<CPubKey, std::vector<uint32_t>> hd_keypaths;
+    std::map<CPubKey, KeyOriginInfo> hd_keypaths;
     std::map<CKeyID, SigPair> partial_sigs;
     std::map<std::vector<unsigned char>, std::vector<unsigned char>> unknown;
     int sighash_type = 0;
@@ -210,7 +240,8 @@ struct PSBTInput
         // If there is a non-witness utxo, then don't add the witness one.
         if (non_witness_utxo) {
             SerializeToVector(s, PSBT_IN_NON_WITNESS_UTXO);
-            SerializeToVector(s, non_witness_utxo);
+            OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() | SERIALIZE_TRANSACTION_NO_WITNESS);
+            SerializeToVector(os, non_witness_utxo);
         } else if (!witness_utxo.IsNull()) {
             SerializeToVector(s, PSBT_IN_WITNESS_UTXO);
             SerializeToVector(s, witness_utxo);
@@ -284,14 +315,22 @@ struct PSBTInput
             // Do stuff based on type
             switch(type) {
                 case PSBT_IN_NON_WITNESS_UTXO:
+                {
                     if (non_witness_utxo) {
                         throw std::ios_base::failure("Duplicate Key, input non-witness utxo already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Non-witness utxo key is more than one byte type");
                     }
-                    UnserializeFromVector(s, non_witness_utxo);
+                    // Set the stream to unserialize with witness since this is always a valid network transaction
+                    OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() & ~SERIALIZE_TRANSACTION_NO_WITNESS);
+                    UnserializeFromVector(os, non_witness_utxo);
                     break;
+                }
                 case PSBT_IN_WITNESS_UTXO:
                     if (!witness_utxo.IsNull()) {
                         throw std::ios_base::failure("Duplicate Key, input witness utxo already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Witness utxo key is more than one byte type");
                     }
                     UnserializeFromVector(s, witness_utxo);
                     break;
@@ -321,6 +360,8 @@ struct PSBTInput
                 case PSBT_IN_SIGHASH:
                     if (sighash_type > 0) {
                         throw std::ios_base::failure("Duplicate Key, input sighash type already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Sighash type key is more than one byte type");
                     }
                     UnserializeFromVector(s, sighash_type);
                     break;
@@ -328,6 +369,8 @@ struct PSBTInput
                 {
                     if (!redeem_script.empty()) {
                         throw std::ios_base::failure("Duplicate Key, input redeemScript already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Input redeemScript key is more than one byte type");
                     }
                     s >> redeem_script;
                     break;
@@ -336,6 +379,8 @@ struct PSBTInput
                 {
                     if (!witness_script.empty()) {
                         throw std::ios_base::failure("Duplicate Key, input witnessScript already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Input witnessScript key is more than one byte type");
                     }
                     s >> witness_script;
                     break;
@@ -349,6 +394,8 @@ struct PSBTInput
                 {
                     if (!final_script_sig.empty()) {
                         throw std::ios_base::failure("Duplicate Key, input final scriptSig already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Final scriptSig key is more than one byte type");
                     }
                     s >> final_script_sig;
                     break;
@@ -357,6 +404,8 @@ struct PSBTInput
                 {
                     if (!final_script_witness.IsNull()) {
                         throw std::ios_base::failure("Duplicate Key, input final scriptWitness already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Final scriptWitness key is more than one byte type");
                     }
                     UnserializeFromVector(s, final_script_witness.stack);
                     break;
@@ -386,7 +435,7 @@ struct PSBTOutput
 {
     CScript redeem_script;
     CScript witness_script;
-    std::map<CPubKey, std::vector<uint32_t>> hd_keypaths;
+    std::map<CPubKey, KeyOriginInfo> hd_keypaths;
     std::map<std::vector<unsigned char>, std::vector<unsigned char>> unknown;
 
     bool IsNull() const;
@@ -444,6 +493,8 @@ struct PSBTOutput
                 {
                     if (!redeem_script.empty()) {
                         throw std::ios_base::failure("Duplicate Key, output redeemScript already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Output redeemScript key is more than one byte type");
                     }
                     s >> redeem_script;
                     break;
@@ -452,6 +503,8 @@ struct PSBTOutput
                 {
                     if (!witness_script.empty()) {
                         throw std::ios_base::failure("Duplicate Key, output witnessScript already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Output witnessScript key is more than one byte type");
                     }
                     s >> witness_script;
                     break;
@@ -516,7 +569,8 @@ struct PartiallySignedTransaction
         SerializeToVector(s, PSBT_GLOBAL_UNSIGNED_TX);
 
         // Write serialized tx to a stream
-        SerializeToVector(s, *tx);
+        OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() | SERIALIZE_TRANSACTION_NO_WITNESS);
+        SerializeToVector(os, *tx);
 
         // Write the unknown things
         for (auto& entry : unknown) {
@@ -566,9 +620,13 @@ struct PartiallySignedTransaction
                 {
                     if (tx) {
                         throw std::ios_base::failure("Duplicate Key, unsigned tx already provided");
+                    } else if (key.size() != 1) {
+                        throw std::ios_base::failure("Global unsigned tx key is more than one byte type");
                     }
                     CMutableTransaction mtx;
-                    UnserializeFromVector(s, mtx);
+                    // Set the stream to serialize with non-witness since this should always be non-witness
+                    OverrideStream<Stream> os(&s, s.GetType(), s.GetVersion() | SERIALIZE_TRANSACTION_NO_WITNESS);
+                    UnserializeFromVector(os, mtx);
                     tx = std::move(mtx);
                     // Make sure that all scriptSigs and scriptWitnesses are empty
                     for (const CTxIn& txin : tx->vin) {
@@ -645,8 +703,8 @@ bool ProduceSignature(const SigningProvider& provider, const BaseSignatureCreato
 bool SignSignature(const SigningProvider &provider, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount& amount, int nHashType);
 bool SignSignature(const SigningProvider &provider, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, int nHashType);
 
-/** Signs a PSBTInput */
-bool SignPSBTInput(const SigningProvider& provider, const CMutableTransaction& tx, PSBTInput& input, SignatureData& sigdata, int index, int sighash = 1);
+/** Signs a PSBTInput, verifying that all provided data matches what is being signed. */
+bool SignPSBTInput(const SigningProvider& provider, const CMutableTransaction& tx, PSBTInput& input, int index, int sighash = SIGHASH_ALL);
 
 /** Extract signature data from a transaction input, and insert it. */
 SignatureData DataFromTransaction(const CMutableTransaction& tx, unsigned int nIn, const CTxOut& txout);
