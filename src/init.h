@@ -8,13 +8,10 @@
 
 #include <memory>
 #include <string>
-#include <util.h>
+#include <util/system.h>
 
 class CScheduler;
 class CWallet;
-
-class WalletInitInterface;
-extern const WalletInitInterface& g_wallet_init_interface;
 
 namespace boost
 {
