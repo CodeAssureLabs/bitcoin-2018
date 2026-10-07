@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2017 The Bitcoin Core developers
+# Copyright (c) 2014-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the wallet backup features.
@@ -30,20 +30,37 @@ confirm 1/2/3/4 balances are same as before.
 Shutdown again, restore using importwallet,
 and confirm again balances are correct.
 """
+from decimal import Decimal
+import os
 from random import randint
 import shutil
 
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import *
+from test_framework.util import (
+    assert_equal,
+    assert_raises_rpc_error,
+    connect_nodes,
+)
+
 
 class WalletBackupTest(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 4
         self.setup_clean_chain = True
         # nodes 1, 2,3 are spenders, let's give them a keypool=100
-        self.extra_args = [["-keypool=100"], ["-keypool=100"], ["-keypool=100"], []]
+        # whitelist all peers to speed up tx relay / mempool sync
+        self.extra_args = [
+            ["-keypool=100", "-whitelist=127.0.0.1"],
+            ["-keypool=100", "-whitelist=127.0.0.1"],
+            ["-keypool=100", "-whitelist=127.0.0.1"],
+            ["-whitelist=127.0.0.1"]
+        ]
+        self.rpc_timeout = 120
 
-    def setup_network(self, split=False):
+    def skip_test_if_missing_module(self):
+        self.skip_if_no_wallet()
+
+    def setup_network(self):
         self.setup_nodes()
         connect_nodes(self.nodes[0], 3)
         connect_nodes(self.nodes[1], 3)
@@ -70,9 +87,9 @@ class WalletBackupTest(BitcoinTestFramework):
 
         # Have the miner (node3) mine a block.
         # Must sync mempools before mining.
-        sync_mempools(self.nodes)
+        self.sync_mempools()
         self.nodes[3].generate(1)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
 
     # As above, this mirrors the original bash test.
     def start_three(self):
@@ -97,13 +114,13 @@ class WalletBackupTest(BitcoinTestFramework):
     def run_test(self):
         self.log.info("Generating initial blockchain")
         self.nodes[0].generate(1)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         self.nodes[1].generate(1)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         self.nodes[2].generate(1)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
         self.nodes[3].generate(100)
-        sync_blocks(self.nodes)
+        self.sync_blocks()
 
         assert_equal(self.nodes[0].getbalance(), 50)
         assert_equal(self.nodes[1].getbalance(), 50)
@@ -160,7 +177,7 @@ class WalletBackupTest(BitcoinTestFramework):
 
         self.log.info("Re-starting nodes")
         self.start_three()
-        sync_blocks(self.nodes)
+        self.sync_blocks()
 
         assert_equal(self.nodes[0].getbalance(), balance0)
         assert_equal(self.nodes[1].getbalance(), balance1)
@@ -184,7 +201,7 @@ class WalletBackupTest(BitcoinTestFramework):
         self.nodes[1].importwallet(os.path.join(self.nodes[1].datadir, 'wallet.dump'))
         self.nodes[2].importwallet(os.path.join(self.nodes[2].datadir, 'wallet.dump'))
 
-        sync_blocks(self.nodes)
+        self.sync_blocks()
 
         assert_equal(self.nodes[0].getbalance(), balance0)
         assert_equal(self.nodes[1].getbalance(), balance1)
