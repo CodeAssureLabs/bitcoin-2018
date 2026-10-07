@@ -1,0 +1,462 @@
+{
+ "artifact_version": 1,
+ "source_manifest_version": 2,
+ "layer_map": {
+  "src/addrdb.cpp": "service",
+  "src/addrdb.h": "service",
+  "src/addrman.cpp": "service",
+  "src/addrman.h": "service",
+  "src/amount.h": "domain",
+  "src/arith_uint256.cpp": "domain",
+  "src/arith_uint256.h": "domain",
+  "src/attributes.h": "utils",
+  "src/base58.cpp": "config",
+  "src/base58.h": "config",
+  "src/bech32.cpp": "config",
+  "src/bech32.h": "config",
+  "src/bitcoin-cli.cpp": "entry",
+  "src/bitcoin-tx.cpp": "entry",
+  "src/bitcoind.cpp": "entry",
+  "src/blockencodings.cpp": "service",
+  "src/blockencodings.h": "service",
+  "src/bloom.cpp": "service",
+  "src/bloom.h": "service",
+  "src/chain.cpp": "service",
+  "src/chain.h": "service",
+  "src/chainparams.cpp": "config",
+  "src/chainparams.h": "config",
+  "src/chainparamsbase.cpp": "utils",
+  "src/chainparamsbase.h": "utils",
+  "src/checkpoints.cpp": "service",
+  "src/checkpoints.h": "service",
+  "src/checkqueue.h": "service",
+  "src/clientversion.cpp": "utils",
+  "src/clientversion.h": "utils",
+  "src/coins.cpp": "config",
+  "src/coins.h": "config",
+  "src/compat.h": "utils",
+  "src/compat/glibc_compat.cpp": "utils",
+  "src/compat/glibc_sanity.cpp": "utils",
+  "src/compat/glibcxx_sanity.cpp": "utils",
+  "src/compat/strnlen.cpp": "utils",
+  "src/compressor.cpp": "config",
+  "src/compressor.h": "config",
+  "src/consensus/merkle.cpp": "domain",
+  "src/consensus/merkle.h": "domain",
+  "src/consensus/params.h": "domain",
+  "src/consensus/tx_verify.cpp": "service",
+  "src/consensus/tx_verify.h": "service",
+  "src/consensus/validation.h": "domain",
+  "src/core_io.h": "config",
+  "src/core_memusage.h": "service",
+  "src/core_read.cpp": "config",
+  "src/core_write.cpp": "config",
+  "src/crypto/aes.cpp": "utils",
+  "src/crypto/aes.h": "utils",
+  "src/crypto/chacha20.cpp": "utils",
+  "src/crypto/chacha20.h": "utils",
+  "src/crypto/common.h": "utils",
+  "src/crypto/ctaes/ctaes.h": "utils",
+  "src/crypto/hmac_sha256.cpp": "utils",
+  "src/crypto/hmac_sha256.h": "utils",
+  "src/crypto/hmac_sha512.cpp": "utils",
+  "src/crypto/hmac_sha512.h": "utils",
+  "src/crypto/ripemd160.cpp": "utils",
+  "src/crypto/ripemd160.h": "utils",
+  "src/crypto/sha1.cpp": "utils",
+  "src/crypto/sha1.h": "utils",
+  "src/crypto/sha256.cpp": "utils",
+  "src/crypto/sha256.h": "utils",
+  "src/crypto/sha256_avx2.cpp": "utils",
+  "src/crypto/sha256_shani.cpp": "utils",
+  "src/crypto/sha256_sse4.cpp": "utils",
+  "src/crypto/sha256_sse41.cpp": "utils",
+  "src/crypto/sha512.cpp": "utils",
+  "src/crypto/sha512.h": "utils",
+  "src/cuckoocache.h": "service",
+  "src/dbwrapper.cpp": "service",
+  "src/dbwrapper.h": "service",
+  "src/fs.cpp": "utils",
+  "src/fs.h": "utils",
+  "src/hash.cpp": "domain",
+  "src/hash.h": "domain",
+  "src/httprpc.cpp": "service",
+  "src/httprpc.h": "service",
+  "src/httpserver.cpp": "service",
+  "src/httpserver.h": "service",
+  "src/index/base.cpp": "service",
+  "src/index/base.h": "service",
+  "src/index/txindex.cpp": "service",
+  "src/index/txindex.h": "service",
+  "src/indirectmap.h": "service",
+  "src/init.cpp": "service",
+  "src/init.h": "service",
+  "src/interfaces/handler.cpp": "utils",
+  "src/interfaces/handler.h": "utils",
+  "src/interfaces/node.cpp": "utils",
+  "src/interfaces/node.h": "utils",
+  "src/interfaces/wallet.cpp": "integration",
+  "src/interfaces/wallet.h": "integration",
+  "src/key.cpp": "config",
+  "src/key.h": "config",
+  "src/key_io.cpp": "config",
+  "src/key_io.h": "config",
+  "src/keystore.cpp": "config",
+  "src/keystore.h": "config",
+  "src/limitedmap.h": "utils",
+  "src/logging.cpp": "utils",
+  "src/logging.h": "utils",
+  "src/memusage.h": "utils",
+  "src/merkleblock.cpp": "service",
+  "src/merkleblock.h": "service",
+  "src/miner.cpp": "service",
+  "src/miner.h": "service",
+  "src/net.cpp": "service",
+  "src/net.h": "service",
+  "src/net_processing.cpp": "service",
+  "src/net_processing.h": "service",
+  "src/netaddress.cpp": "config",
+  "src/netaddress.h": "config",
+  "src/netbase.cpp": "config",
+  "src/netbase.h": "config",
+  "src/noui.cpp": "service",
+  "src/noui.h": "service",
+  "src/outputtype.cpp": "service",
+  "src/outputtype.h": "service",
+  "src/policy/feerate.cpp": "config",
+  "src/policy/feerate.h": "config",
+  "src/policy/fees.cpp": "service",
+  "src/policy/fees.h": "service",
+  "src/policy/policy.cpp": "service",
+  "src/policy/policy.h": "service",
+  "src/policy/rbf.cpp": "service",
+  "src/policy/rbf.h": "service",
+  "src/pow.cpp": "service",
+  "src/pow.h": "service",
+  "src/prevector.h": "domain",
+  "src/primitives/block.cpp": "domain",
+  "src/primitives/block.h": "domain",
+  "src/primitives/transaction.cpp": "domain",
+  "src/primitives/transaction.h": "domain",
+  "src/protocol.cpp": "config",
+  "src/protocol.h": "config",
+  "src/pubkey.cpp": "domain",
+  "src/pubkey.h": "domain",
+  "src/random.cpp": "utils",
+  "src/random.h": "utils",
+  "src/rest.cpp": "service",
+  "src/reverse_iterator.h": "utils",
+  "src/reverselock.h": "utils",
+  "src/rpc/blockchain.cpp": "service",
+  "src/rpc/blockchain.h": "service",
+  "src/rpc/client.cpp": "entry",
+  "src/rpc/client.h": "entry",
+  "src/rpc/mining.cpp": "service",
+  "src/rpc/mining.h": "service",
+  "src/rpc/misc.cpp": "service",
+  "src/rpc/net.cpp": "service",
+  "src/rpc/protocol.cpp": "utils",
+  "src/rpc/protocol.h": "utils",
+  "src/rpc/rawtransaction.cpp": "service",
+  "src/rpc/rawtransaction.h": "service",
+  "src/rpc/server.cpp": "service",
+  "src/rpc/server.h": "service",
+  "src/rpc/util.cpp": "service",
+  "src/rpc/util.h": "service",
+  "src/scheduler.cpp": "config",
+  "src/scheduler.h": "config",
+  "src/script/bitcoinconsensus.cpp": "domain",
+  "src/script/bitcoinconsensus.h": "domain",
+  "src/script/interpreter.cpp": "domain",
+  "src/script/interpreter.h": "domain",
+  "src/script/ismine.cpp": "config",
+  "src/script/ismine.h": "config",
+  "src/script/script.cpp": "domain",
+  "src/script/script.h": "domain",
+  "src/script/script_error.cpp": "domain",
+  "src/script/script_error.h": "domain",
+  "src/script/sigcache.cpp": "service",
+  "src/script/sigcache.h": "service",
+  "src/script/sign.cpp": "config",
+  "src/script/sign.h": "config",
+  "src/script/standard.cpp": "config",
+  "src/script/standard.h": "config",
+  "src/serialize.h": "domain",
+  "src/shutdown.cpp": "service",
+  "src/shutdown.h": "service",
+  "src/span.h": "domain",
+  "src/streams.h": "utils",
+  "src/support/cleanse.cpp": "utils",
+  "src/support/cleanse.h": "utils",
+  "src/support/lockedpool.cpp": "utils",
+  "src/support/lockedpool.h": "utils",
+  "src/sync.cpp": "utils",
+  "src/sync.h": "utils",
+  "src/threadinterrupt.cpp": "utils",
+  "src/threadinterrupt.h": "utils",
+  "src/threadsafety.h": "utils",
+  "src/timedata.cpp": "service",
+  "src/timedata.h": "service",
+  "src/tinyformat.h": "domain",
+  "src/torcontrol.cpp": "service",
+  "src/torcontrol.h": "service",
+  "src/txdb.cpp": "service",
+  "src/txdb.h": "service",
+  "src/txmempool.cpp": "service",
+  "src/txmempool.h": "service",
+  "src/ui_interface.cpp": "service",
+  "src/ui_interface.h": "service",
+  "src/uint256.cpp": "domain",
+  "src/uint256.h": "domain",
+  "src/undo.h": "service",
+  "src/util.cpp": "utils",
+  "src/util.h": "utils",
+  "src/utilmoneystr.cpp": "utils",
+  "src/utilmoneystr.h": "utils",
+  "src/utilstrencodings.cpp": "utils",
+  "src/utilstrencodings.h": "domain",
+  "src/utiltime.cpp": "utils",
+  "src/utiltime.h": "utils",
+  "src/validation.cpp": "service",
+  "src/validation.h": "service",
+  "src/validationinterface.cpp": "service",
+  "src/validationinterface.h": "service",
+  "src/version.h": "domain",
+  "src/versionbits.cpp": "service",
+  "src/versionbits.h": "service",
+  "src/versionbits_impl.h": "service",
+  "src/wallet/coinselection.cpp": "integration",
+  "src/wallet/coinselection.h": "integration",
+  "src/wallet/crypter.cpp": "integration",
+  "src/wallet/crypter.h": "integration",
+  "src/wallet/db.cpp": "integration",
+  "src/wallet/db.h": "integration",
+  "src/wallet/feebumper.cpp": "integration",
+  "src/wallet/feebumper.h": "integration",
+  "src/wallet/fees.cpp": "integration",
+  "src/wallet/fees.h": "integration",
+  "src/wallet/init.cpp": "integration",
+  "src/wallet/rpcdump.cpp": "integration",
+  "src/wallet/rpcwallet.cpp": "integration",
+  "src/wallet/rpcwallet.h": "integration",
+  "src/wallet/wallet.cpp": "integration",
+  "src/wallet/wallet.h": "integration",
+  "src/wallet/walletdb.cpp": "integration",
+  "src/wallet/walletdb.h": "integration",
+  "src/wallet/walletutil.cpp": "integration",
+  "src/wallet/walletutil.h": "integration",
+  "src/warnings.cpp": "config",
+  "src/warnings.h": "config",
+  "src/zmq/zmqabstractnotifier.cpp": "service",
+  "src/zmq/zmqabstractnotifier.h": "service",
+  "src/zmq/zmqnotificationinterface.cpp": "service",
+  "src/zmq/zmqnotificationinterface.h": "service",
+  "src/zmq/zmqpublishnotifier.cpp": "service",
+  "src/zmq/zmqpublishnotifier.h": "service",
+  "src/zmq/zmqrpc.cpp": "service",
+  "src/zmq/zmqrpc.h": "service"
+ },
+ "path_globs": [
+  {
+   "glob": "src/test/**",
+   "layer": "tests"
+  },
+  {
+   "glob": "src/bench/**",
+   "layer": "tests"
+  },
+  {
+   "glob": "src/wallet/test/**",
+   "layer": "tests"
+  },
+  {
+   "glob": "src/qt/test/**",
+   "layer": "tests"
+  },
+  {
+   "glob": "test/**",
+   "layer": "tests"
+  },
+  {
+   "glob": "src/init/**",
+   "layer": "entry"
+  },
+  {
+   "glob": "src/bitcoin*.cpp",
+   "layer": "entry"
+  },
+  {
+   "glob": "src/qt/**",
+   "layer": "api"
+  },
+  {
+   "glob": "src/wallet/**",
+   "layer": "integration"
+  },
+  {
+   "glob": "src/netaddress*",
+   "layer": "config"
+  },
+  {
+   "glob": "src/netbase*",
+   "layer": "config"
+  },
+  {
+   "glob": "src/net_types*",
+   "layer": "config"
+  },
+  {
+   "glob": "src/net_permissions*",
+   "layer": "config"
+  },
+  {
+   "glob": "src/rpc/**",
+   "layer": "service"
+  },
+  {
+   "glob": "src/zmq/**",
+   "layer": "service"
+  },
+  {
+   "glob": "src/node/**",
+   "layer": "service"
+  },
+  {
+   "glob": "src/index/**",
+   "layer": "service"
+  },
+  {
+   "glob": "src/ipc/**",
+   "layer": "service"
+  },
+  {
+   "glob": "src/net*",
+   "layer": "service"
+  },
+  {
+   "glob": "src/addrman*",
+   "layer": "service"
+  },
+  {
+   "glob": "src/kernel/**",
+   "layer": "data"
+  },
+  {
+   "glob": "src/policy/**",
+   "layer": "data"
+  },
+  {
+   "glob": "src/validation*",
+   "layer": "data"
+  },
+  {
+   "glob": "src/txmempool*",
+   "layer": "data"
+  },
+  {
+   "glob": "src/consensus/**",
+   "layer": "domain"
+  },
+  {
+   "glob": "src/primitives/**",
+   "layer": "domain"
+  },
+  {
+   "glob": "src/script/**",
+   "layer": "domain"
+  },
+  {
+   "glob": "src/common/**",
+   "layer": "config"
+  },
+  {
+   "glob": "src/interfaces/**",
+   "layer": "config"
+  },
+  {
+   "glob": "src/chainparams*",
+   "layer": "config"
+  },
+  {
+   "glob": "src/util/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/crypto/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/support/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/compat/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/logging/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/secp256k1/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/leveldb/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/crc32c/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/minisketch/**",
+   "layer": "utils"
+  },
+  {
+   "glob": "src/univalue/**",
+   "layer": "utils"
+  }
+ ],
+ "compiled_rules": {
+  "allowed": {
+   "entry": [
+    "api",
+    "config",
+    "data",
+    "domain",
+    "integration",
+    "service",
+    "utils"
+   ],
+   "api": [
+    "config",
+    "domain",
+    "utils"
+   ],
+   "service": [
+    "config",
+    "data",
+    "domain",
+    "utils"
+   ],
+   "integration": [
+    "config",
+    "domain",
+    "utils"
+   ],
+   "data": [
+    "domain",
+    "utils"
+   ],
+   "domain": [
+    "utils"
+   ],
+   "config": [
+    "domain",
+    "utils"
+   ],
+   "utils": []
+  }
+ }
+}
