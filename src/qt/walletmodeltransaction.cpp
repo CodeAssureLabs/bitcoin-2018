@@ -1,10 +1,13 @@
-// Copyright (c) 2011-2017 The Bitcoin Core developers
+// Copyright (c) 2011-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#ifdef HAVE_CONFIG_H
+#include <config/bitcoin-config.h>
+#endif
+
 #include <qt/walletmodeltransaction.h>
 
-#include <interfaces/node.h>
 #include <policy/policy.h>
 
 WalletModelTransaction::WalletModelTransaction(const QList<SendCoinsRecipient> &_recipients) :
@@ -25,7 +28,7 @@ std::unique_ptr<interfaces::PendingWalletTx>& WalletModelTransaction::getWtx()
 
 unsigned int WalletModelTransaction::getTransactionSize()
 {
-    return wtx ? wtx->getVirtualSize() : 0;
+    return wtx ? GetVirtualTransactionSize(wtx->get()) : 0;
 }
 
 CAmount WalletModelTransaction::getTransactionFee() const
@@ -46,6 +49,7 @@ void WalletModelTransaction::reassignAmounts(int nChangePosRet)
     {
         SendCoinsRecipient& rcp = (*it);
 
+#ifdef ENABLE_BIP70
         if (rcp.paymentRequest.IsInitialized())
         {
             CAmount subtotal = 0;
@@ -62,6 +66,7 @@ void WalletModelTransaction::reassignAmounts(int nChangePosRet)
             rcp.amount = subtotal;
         }
         else // normal recipient (no payment request)
+#endif
         {
             if (i == nChangePosRet)
                 i++;

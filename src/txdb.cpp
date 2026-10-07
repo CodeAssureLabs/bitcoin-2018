@@ -5,13 +5,11 @@
 
 #include <txdb.h>
 
-#include <chainparams.h>
-#include <hash.h>
 #include <random.h>
 #include <pow.h>
 #include <shutdown.h>
 #include <uint256.h>
-#include <util.h>
+#include <util/system.h>
 #include <ui_interface.h>
 
 #include <stdint.h>
@@ -53,7 +51,7 @@ struct CoinEntry {
 
 }
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe) : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true) 
+CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool fMemory, bool fWipe) : db(GetDataDir() / "chainstate", nCacheSize, fMemory, fWipe, true)
 {
 }
 
@@ -160,9 +158,8 @@ bool CBlockTreeDB::WriteReindexing(bool fReindexing) {
         return Erase(DB_REINDEX_FLAG);
 }
 
-bool CBlockTreeDB::ReadReindexing(bool &fReindexing) {
+void CBlockTreeDB::ReadReindexing(bool &fReindexing) {
     fReindexing = Exists(DB_REINDEX_FLAG);
-    return true;
 }
 
 bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
@@ -256,6 +253,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
     // Load mapBlockIndex
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
+        if (ShutdownRequested()) return false;
         std::pair<char, uint256> key;
         if (pcursor->GetKey(key) && key.first == DB_BLOCK_INDEX) {
             CDiskBlockIndex diskindex;

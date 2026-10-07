@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -133,7 +133,7 @@ protected:
     //! will encrypt previously unencrypted keys
     bool EncryptKeys(CKeyingMaterial& vMasterKeyIn);
 
-    bool Unlock(const CKeyingMaterial& vMasterKeyIn);
+    bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys = false);
     CryptedKeyMap mapCryptedKeys GUARDED_BY(cs_KeyStore);
 
 public:

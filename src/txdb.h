@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -37,6 +37,8 @@ static const int64_t nMaxBlockDBCache = 2;
 // Unlike for the UTXO database, for the txindex scenario the leveldb cache make
 // a meaningful difference: https://github.com/bitcoin/bitcoin/pull/8273#issuecomment-229601991
 static const int64_t nMaxTxIndexCache = 1024;
+//! Max memory allocated to all block filter index caches combined in MiB.
+static const int64_t max_filter_index_cache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
 
@@ -92,7 +94,7 @@ public:
     bool ReadBlockFileInfo(int nFile, CBlockFileInfo &info);
     bool ReadLastBlockFile(int &nFile);
     bool WriteReindexing(bool fReindexing);
-    bool ReadReindexing(bool &fReindexing);
+    void ReadReindexing(bool &fReindexing);
     bool WriteFlag(const std::string &name, bool fValue);
     bool ReadFlag(const std::string &name, bool &fValue);
     bool LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex);

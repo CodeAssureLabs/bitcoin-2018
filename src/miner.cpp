@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,32 +10,22 @@
 #include <chainparams.h>
 #include <coins.h>
 #include <consensus/consensus.h>
-#include <consensus/tx_verify.h>
 #include <consensus/merkle.h>
+#include <consensus/tx_verify.h>
 #include <consensus/validation.h>
-#include <hash.h>
-#include <net.h>
 #include <policy/feerate.h>
 #include <policy/policy.h>
 #include <pow.h>
 #include <primitives/transaction.h>
 #include <script/standard.h>
 #include <timedata.h>
-#include <util.h>
-#include <utilmoneystr.h>
-#include <validationinterface.h>
+#include <util/moneystr.h>
+#include <util/system.h>
+#include <util/validation.h>
 
 #include <algorithm>
 #include <queue>
 #include <utility>
-
-// Unconfirmed transactions in the memory pool often depend on other
-// transactions in the memory pool. When we select transactions from the
-// pool, we select by highest fee rate of a transaction combined with all
-// its ancestors.
-
-uint64_t nLastBlockTx = 0;
-uint64_t nLastBlockWeight = 0;
 
 int64_t UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
@@ -64,15 +54,14 @@ BlockAssembler::BlockAssembler(const CChainParams& params, const Options& option
     nBlockMaxWeight = std::max<size_t>(4000, std::min<size_t>(MAX_BLOCK_WEIGHT - 4000, options.nBlockMaxWeight));
 }
 
-static BlockAssembler::Options DefaultOptions(const CChainParams& params)
+static BlockAssembler::Options DefaultOptions()
 {
     // Block resource limits
     // If -blockmaxweight is not given, limit to DEFAULT_BLOCK_MAX_WEIGHT
     BlockAssembler::Options options;
     options.nBlockMaxWeight = gArgs.GetArg("-blockmaxweight", DEFAULT_BLOCK_MAX_WEIGHT);
-    if (gArgs.IsArgSet("-blockmintxfee")) {
-        CAmount n = 0;
-        ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n);
+    CAmount n = 0;
+    if (gArgs.IsArgSet("-blockmintxfee") && ParseMoney(gArgs.GetArg("-blockmintxfee", ""), n)) {
         options.blockMinFeeRate = CFeeRate(n);
     } else {
         options.blockMinFeeRate = CFeeRate(DEFAULT_BLOCK_MIN_TX_FEE);
@@ -80,7 +69,7 @@ static BlockAssembler::Options DefaultOptions(const CChainParams& params)
     return options;
 }
 
-BlockAssembler::BlockAssembler(const CChainParams& params) : BlockAssembler(params, DefaultOptions(params)) {}
+BlockAssembler::BlockAssembler(const CChainParams& params) : BlockAssembler(params, DefaultOptions()) {}
 
 void BlockAssembler::resetBlock()
 {
@@ -96,7 +85,10 @@ void BlockAssembler::resetBlock()
     nFees = 0;
 }
 
-std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn, bool fMineWitnessTx)
+Optional<int64_t> BlockAssembler::m_last_block_num_txs{nullopt};
+Optional<int64_t> BlockAssembler::m_last_block_weight{nullopt};
+
+std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
 {
     int64_t nTimeStart = GetTimeMicros();
 
@@ -114,7 +106,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     pblocktemplate->vTxSigOpsCost.push_back(-1); // updated at end
 
     LOCK2(cs_main, mempool.cs);
-    CBlockIndex* pindexPrev = chainActive.Tip();
+    CBlockIndex* pindexPrev = ::ChainActive().Tip();
     assert(pindexPrev != nullptr);
     nHeight = pindexPrev->nHeight + 1;
 
@@ -133,11 +125,14 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     // Decide whether to include witness transactions
     // This is only needed in case the witness softfork activation is reverted
-    // (which would require a very deep reorganization) or when
-    // -promiscuousmempoolflags is used.
+    // (which would require a very deep reorganization).
+    // Note that the mempool would accept transactions with witness data before
+    // IsWitnessEnabled, but we would only ever mine blocks after IsWitnessEnabled
+    // unless there is a massive block reorganization with the witness softfork
+    // not activated.
     // TODO: replace this with a call to main to assess validity of a mempool
     // transaction (which in most cases can be a no-op).
-    fIncludeWitness = IsWitnessEnabled(pindexPrev, chainparams.GetConsensus()) && fMineWitnessTx;
+    fIncludeWitness = IsWitnessEnabled(pindexPrev, chainparams.GetConsensus());
 
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
@@ -145,8 +140,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     int64_t nTime1 = GetTimeMicros();
 
-    nLastBlockTx = nBlockTx;
-    nLastBlockWeight = nBlockWeight;
+    m_last_block_num_txs = nBlockTx;
+    m_last_block_weight = nBlockWeight;
 
     // Create coinbase transaction.
     CMutableTransaction coinbaseTx;

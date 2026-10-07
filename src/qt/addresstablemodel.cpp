@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2017 The Bitcoin Core developers
+// Copyright (c) 2011-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,6 @@
 #include <qt/guiutil.h>
 #include <qt/walletmodel.h>
 
-#include <interfaces/node.h>
 #include <key_io.h>
 #include <wallet/wallet.h>
 
@@ -71,7 +70,7 @@ public:
     QList<AddressTableEntry> cachedAddressTable;
     AddressTableModel *parent;
 
-    AddressTablePriv(AddressTableModel *_parent):
+    explicit AddressTablePriv(AddressTableModel *_parent):
         parent(_parent) {}
 
     void refreshAddressTable(interfaces::Wallet& wallet)
@@ -153,7 +152,7 @@ public:
         }
         else
         {
-            return 0;
+            return nullptr;
         }
     }
 };
@@ -300,8 +299,8 @@ QVariant AddressTableModel::headerData(int section, Qt::Orientation orientation,
 
 Qt::ItemFlags AddressTableModel::flags(const QModelIndex &index) const
 {
-    if(!index.isValid())
-        return 0;
+    if (!index.isValid()) return Qt::NoItemFlags;
+
     AddressTableEntry *rec = static_cast<AddressTableEntry*>(index.internalPointer());
 
     Qt::ItemFlags retval = Qt::ItemIsSelectable | Qt::ItemIsEnabled;
