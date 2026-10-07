@@ -1,35 +1,45 @@
-// Copyright (c) 2012-2017 The Bitcoin Core developers
+// Copyright (c) 2012-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <rpc/server.h>
 #include <rpc/client.h>
+#include <rpc/server.h>
+#include <rpc/util.h>
 
 #include <core_io.h>
-#include <key_io.h>
-#include <netbase.h>
-
-#include <test/test_bitcoin.h>
+#include <interfaces/chain.h>
+#include <node/context.h>
+#include <test/util/setup_common.h>
+#include <util/ref.h>
+#include <util/time.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/test/unit_test.hpp>
 
 #include <univalue.h>
 
-UniValue CallRPC(std::string args)
+#include <rpc/blockchain.h>
+
+class RPCTestingSetup : public TestingSetup
+{
+public:
+    UniValue CallRPC(std::string args);
+};
+
+UniValue RPCTestingSetup::CallRPC(std::string args)
 {
     std::vector<std::string> vArgs;
     boost::split(vArgs, args, boost::is_any_of(" \t"));
     std::string strMethod = vArgs[0];
     vArgs.erase(vArgs.begin());
-    JSONRPCRequest request;
+    util::Ref context{m_node};
+    JSONRPCRequest request(context);
     request.strMethod = strMethod;
     request.params = RPCConvertValues(strMethod, vArgs);
     request.fHelp = false;
-    BOOST_CHECK(tableRPC[strMethod]);
-    rpcfn_type method = tableRPC[strMethod]->actor;
+    if (RPCIsInWarmup(nullptr)) SetRPCWarmupFinished();
     try {
-        UniValue result = (*method)(request);
+        UniValue result = tableRPC.execute(request);
         return result;
     }
     catch (const UniValue& objError) {
@@ -38,7 +48,7 @@ UniValue CallRPC(std::string args)
 }
 
 
-BOOST_FIXTURE_TEST_SUITE(rpc_tests, TestingSetup)
+BOOST_FIXTURE_TEST_SUITE(rpc_tests, RPCTestingSetup)
 
 BOOST_AUTO_TEST_CASE(rpc_rawparams)
 {
@@ -119,9 +129,6 @@ BOOST_AUTO_TEST_CASE(rpc_rawsign)
 BOOST_AUTO_TEST_CASE(rpc_createraw_op_return)
 {
     BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"data\":\"68656c6c6f776f726c64\"}"));
-
-    // Allow more than one data transaction output
-    BOOST_CHECK_NO_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"data\":\"68656c6c6f776f726c64\",\"data\":\"68656c6c6f776f726c64\"}"));
 
     // Key not "data" (bad address)
     BOOST_CHECK_THROW(CallRPC("createrawtransaction [{\"txid\":\"a3b807410df0b60fcb9736768df5823938b2f838694939ba45f3c0a1bff150ed\",\"vout\":0}] {\"somedata\":\"68656c6c6f776f726c64\"}"), std::runtime_error);
@@ -334,6 +341,84 @@ BOOST_AUTO_TEST_CASE(rpc_convert_values_generatetoaddress)
     BOOST_CHECK_EQUAL(result[0].get_int(), 1);
     BOOST_CHECK_EQUAL(result[1].get_str(), "mhMbmE2tE9xzJYCV9aNC8jKWN31vtGrguU");
     BOOST_CHECK_EQUAL(result[2].get_int(), 9);
+}
+
+BOOST_AUTO_TEST_CASE(rpc_getblockstats_calculate_percentiles_by_weight)
+{
+    int64_t total_weight = 200;
+    std::vector<std::pair<CAmount, int64_t>> feerates;
+    CAmount result[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+
+    for (int64_t i = 0; i < 100; i++) {
+        feerates.emplace_back(std::make_pair(1 ,1));
+    }
+
+    for (int64_t i = 0; i < 100; i++) {
+        feerates.emplace_back(std::make_pair(2 ,1));
+    }
+
+    CalculatePercentilesByWeight(result, feerates, total_weight);
+    BOOST_CHECK_EQUAL(result[0], 1);
+    BOOST_CHECK_EQUAL(result[1], 1);
+    BOOST_CHECK_EQUAL(result[2], 1);
+    BOOST_CHECK_EQUAL(result[3], 2);
+    BOOST_CHECK_EQUAL(result[4], 2);
+
+    // Test with more pairs, and two pairs overlapping 2 percentiles.
+    total_weight = 100;
+    CAmount result2[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+    feerates.clear();
+
+    feerates.emplace_back(std::make_pair(1, 9));
+    feerates.emplace_back(std::make_pair(2 , 16)); //10th + 25th percentile
+    feerates.emplace_back(std::make_pair(4 ,50)); //50th + 75th percentile
+    feerates.emplace_back(std::make_pair(5 ,10));
+    feerates.emplace_back(std::make_pair(9 ,15));  // 90th percentile
+
+    CalculatePercentilesByWeight(result2, feerates, total_weight);
+
+    BOOST_CHECK_EQUAL(result2[0], 2);
+    BOOST_CHECK_EQUAL(result2[1], 2);
+    BOOST_CHECK_EQUAL(result2[2], 4);
+    BOOST_CHECK_EQUAL(result2[3], 4);
+    BOOST_CHECK_EQUAL(result2[4], 9);
+
+    // Same test as above, but one of the percentile-overlapping pairs is split in 2.
+    total_weight = 100;
+    CAmount result3[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+    feerates.clear();
+
+    feerates.emplace_back(std::make_pair(1, 9));
+    feerates.emplace_back(std::make_pair(2 , 11)); // 10th percentile
+    feerates.emplace_back(std::make_pair(2 , 5)); // 25th percentile
+    feerates.emplace_back(std::make_pair(4 ,50)); //50th + 75th percentile
+    feerates.emplace_back(std::make_pair(5 ,10));
+    feerates.emplace_back(std::make_pair(9 ,15)); // 90th percentile
+
+    CalculatePercentilesByWeight(result3, feerates, total_weight);
+
+    BOOST_CHECK_EQUAL(result3[0], 2);
+    BOOST_CHECK_EQUAL(result3[1], 2);
+    BOOST_CHECK_EQUAL(result3[2], 4);
+    BOOST_CHECK_EQUAL(result3[3], 4);
+    BOOST_CHECK_EQUAL(result3[4], 9);
+
+    // Test with one transaction spanning all percentiles.
+    total_weight = 104;
+    CAmount result4[NUM_GETBLOCKSTATS_PERCENTILES] = { 0 };
+    feerates.clear();
+
+    feerates.emplace_back(std::make_pair(1, 100));
+    feerates.emplace_back(std::make_pair(2, 1));
+    feerates.emplace_back(std::make_pair(3, 1));
+    feerates.emplace_back(std::make_pair(3, 1));
+    feerates.emplace_back(std::make_pair(999999, 1));
+
+    CalculatePercentilesByWeight(result4, feerates, total_weight);
+
+    for (int64_t i = 0; i < NUM_GETBLOCKSTATS_PERCENTILES; i++) {
+        BOOST_CHECK_EQUAL(result4[i], 1);
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
