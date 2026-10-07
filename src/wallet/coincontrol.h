@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2017 The Bitcoin Core developers
+// Copyright (c) 2011-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,6 +11,9 @@
 #include <wallet/wallet.h>
 
 #include <boost/optional.hpp>
+
+const int DEFAULT_MIN_DEPTH = 0;
+const int DEFAULT_MAX_DEPTH = 9999999;
 
 /** Coin Control Features. */
 class CCoinControl
@@ -32,27 +35,23 @@ public:
     boost::optional<unsigned int> m_confirm_target;
     //! Override the wallet's m_signal_rbf if set
     boost::optional<bool> m_signal_bip125_rbf;
+    //! Avoid partial use of funds sent to a given address
+    bool m_avoid_partial_spends;
+    //! Forbids inclusion of dirty (previously used) addresses
+    bool m_avoid_address_reuse;
     //! Fee estimation mode to control arguments to estimateSmartFee
     FeeEstimateMode m_fee_mode;
+    //! Minimum chain depth value for coin availability
+    int m_min_depth = DEFAULT_MIN_DEPTH;
+    //! Maximum chain depth value for coin availability
+    int m_max_depth = DEFAULT_MAX_DEPTH;
 
     CCoinControl()
     {
         SetNull();
     }
 
-    void SetNull()
-    {
-        destChange = CNoDestination();
-        m_change_type.reset();
-        fAllowOtherInputs = false;
-        fAllowWatchOnly = false;
-        setSelected.clear();
-        m_feerate.reset();
-        fOverrideFeeRate = false;
-        m_confirm_target.reset();
-        m_signal_bip125_rbf.reset();
-        m_fee_mode = FeeEstimateMode::UNSET;
-    }
+    void SetNull();
 
     bool HasSelected() const
     {

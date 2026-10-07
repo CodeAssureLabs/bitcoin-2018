@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2017 The Bitcoin Core developers
+// Copyright (c) 2011-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,6 +10,7 @@
 
 #include <QEvent>
 #include <QHeaderView>
+#include <QItemDelegate>
 #include <QMessageBox>
 #include <QObject>
 #include <QProgressBar>
@@ -30,6 +31,7 @@ class QAbstractItemView;
 class QDateTime;
 class QFont;
 class QLineEdit;
+class QProgressDialog;
 class QUrl;
 class QWidget;
 QT_END_NAMESPACE
@@ -77,6 +79,11 @@ namespace GUIUtil
 
     void setClipboard(const QString& str);
 
+    /**
+     * Determine default data directory for operating system.
+     */
+    QString getDefaultDataDirectory();
+
     /** Get save filename, mimics QFileDialog::getSaveFileName, except that it appends a default suffix
         when no suffix is provided by the user.
 
@@ -114,14 +121,14 @@ namespace GUIUtil
     // Determine whether a widget is hidden behind other windows
     bool isObscured(QWidget *w);
 
+    // Activate, show and raise the widget
+    void bringToFront(QWidget* w);
+
     // Open debug.log
     void openDebugLogfile();
 
     // Open the config file
     bool openBitcoinConf();
-
-    // Replace invalid default fonts with known good ones
-    void SubstituteFonts(const QString& language);
 
     /** Qt event filter that intercepts ToolTipChange events, and replaces the tooltip with a rich text
       representation if needed. This assures that Qt can word-wrap long tooltip messages.
@@ -132,7 +139,7 @@ namespace GUIUtil
         Q_OBJECT
 
     public:
-        explicit ToolTipToRichTextFilter(int size_threshold, QObject *parent = 0);
+        explicit ToolTipToRichTextFilter(int size_threshold, QObject *parent = nullptr);
 
     protected:
         bool eventFilter(QObject *obj, QEvent *evt);
@@ -219,11 +226,11 @@ namespace GUIUtil
     protected:
         void mouseReleaseEvent(QMouseEvent *event);
     };
-    
+
     class ClickableProgressBar : public QProgressBar
     {
         Q_OBJECT
-        
+
     Q_SIGNALS:
         /** Emitted when the progressbar is clicked. The relative mouse coordinates of the click are
          * passed to the signal.
@@ -233,20 +240,31 @@ namespace GUIUtil
         void mouseReleaseEvent(QMouseEvent *event);
     };
 
-#if defined(Q_OS_MAC)
-    // workaround for Qt OSX Bug:
-    // https://bugreports.qt-project.org/browse/QTBUG-15631
-    // QProgressBar uses around 10% CPU even when app is in background
-    class ProgressBar : public ClickableProgressBar
-    {
-        bool event(QEvent *e) {
-            return (e->type() != QEvent::StyleAnimationUpdate) ? QProgressBar::event(e) : false;
-        }
-    };
-#else
     typedef ClickableProgressBar ProgressBar;
-#endif
 
+    class ItemDelegate : public QItemDelegate
+    {
+        Q_OBJECT
+    public:
+        ItemDelegate(QObject* parent) : QItemDelegate(parent) {}
+
+    Q_SIGNALS:
+        void keyEscapePressed();
+
+    private:
+        bool eventFilter(QObject *object, QEvent *event);
+    };
+
+    // Fix known bugs in QProgressDialog class.
+    void PolishProgressDialog(QProgressDialog* dialog);
+
+    /**
+     * Returns the distance in pixels appropriate for drawing a subsequent character after text.
+     *
+     * In Qt 5.12 and before the QFontMetrics::width() is used and it is deprecated since Qt 13.0.
+     * In Qt 5.11 the QFontMetrics::horizontalAdvance() was introduced.
+     */
+    int TextWidth(const QFontMetrics& fm, const QString& text);
 } // namespace GUIUtil
 
 #endif // BITCOIN_QT_GUIUTIL_H
