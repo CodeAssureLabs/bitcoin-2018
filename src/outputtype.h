@@ -1,14 +1,16 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_OUTPUTTYPE_H
 #define BITCOIN_OUTPUTTYPE_H
 
-#include <keystore.h>
+#include <attributes.h>
+#include <script/signingprovider.h>
 #include <script/standard.h>
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -26,7 +28,9 @@ enum class OutputType {
     CHANGE_AUTO,
 };
 
-bool ParseOutputType(const std::string& str, OutputType& output_type);
+extern const std::array<OutputType, 3> OUTPUT_TYPES;
+
+NODISCARD bool ParseOutputType(const std::string& str, OutputType& output_type);
 const std::string& FormatOutputType(OutputType type);
 
 /**
@@ -43,7 +47,6 @@ std::vector<CTxDestination> GetAllDestinationsForKey(const CPubKey& key);
  * This function will automatically add the script (and any other
  * necessary scripts) to the keystore.
  */
-CTxDestination AddAndGetDestinationForScript(CKeyStore& keystore, const CScript& script, OutputType);
+CTxDestination AddAndGetDestinationForScript(FillableSigningProvider& keystore, const CScript& script, OutputType);
 
 #endif // BITCOIN_OUTPUTTYPE_H
-
