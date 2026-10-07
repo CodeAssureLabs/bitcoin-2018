@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2017 The Bitcoin Core developers
+// Copyright (c) 2011-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,7 @@
 #include <qt/optionsmodel.h>
 
 #include <qt/bitcoinunits.h>
+#include <qt/guiconstants.h>
 #include <qt/guiutil.h>
 
 #include <interfaces/node.h>
@@ -57,7 +58,7 @@ void OptionsModel::Init(bool resetSettings)
         settings.setValue("fHideTrayIcon", false);
     fHideTrayIcon = settings.value("fHideTrayIcon").toBool();
     Q_EMIT hideTrayIconChanged(fHideTrayIcon);
-    
+
     if (!settings.contains("fMinimizeToTray"))
         settings.setValue("fMinimizeToTray", false);
     fMinimizeToTray = settings.value("fMinimizeToTray").toBool() && !fHideTrayIcon;
@@ -92,10 +93,10 @@ void OptionsModel::Init(bool resetSettings)
         settings.setValue("bPrune", false);
     if (!settings.contains("nPruneSize"))
         settings.setValue("nPruneSize", 2);
-    // Convert prune size to MB:
-    const uint64_t nPruneSizeMB = settings.value("nPruneSize").toInt() * 1000;
-    if (!m_node.softSetArg("-prune", settings.value("bPrune").toBool() ? std::to_string(nPruneSizeMB) : "0")) {
-      addOverriddenOption("-prune");
+    // Convert prune size from GB to MiB:
+    const uint64_t nPruneSizeMiB = (settings.value("nPruneSize").toInt() * GB_BYTES) >> 20;
+    if (!m_node.softSetArg("-prune", settings.value("bPrune").toBool() ? std::to_string(nPruneSizeMiB) : "0")) {
+        addOverriddenOption("-prune");
     }
 
     if (!settings.contains("nDatabaseCache"))
