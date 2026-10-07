@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2017 The Bitcoin Core developers
+// Copyright (c) 2015-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,7 +6,6 @@
 #define BITCOIN_BENCH_BENCH_H
 
 #include <functional>
-#include <limits>
 #include <map>
 #include <string>
 #include <vector>

@@ -1,4 +1,4 @@
-// Copyright (c) 2012-2017 The Bitcoin Core developers
+// Copyright (c) 2012-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +14,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include <algorithm>
 
 #define LN2SQUARED 0.4804530139182014246671025263266649717305529515945455
 #define LN2 0.6931471805599453094172321214581765680755001343602552
@@ -35,17 +36,6 @@ CBloomFilter::CBloomFilter(const unsigned int nElements, const double nFPRate, c
     nHashFuncs(std::min((unsigned int)(vData.size() * 8 / nElements * LN2), MAX_HASH_FUNCS)),
     nTweak(nTweakIn),
     nFlags(nFlagsIn)
-{
-}
-
-// Private constructor used by CRollingBloomFilter
-CBloomFilter::CBloomFilter(const unsigned int nElements, const double nFPRate, const unsigned int nTweakIn) :
-    vData((unsigned int)(-1  / LN2SQUARED * nElements * log(nFPRate)) / 8),
-    isFull(false),
-    isEmpty(true),
-    nHashFuncs((unsigned int)(vData.size() * 8 / nElements * LN2)),
-    nTweak(nTweakIn),
-    nFlags(BLOOM_UPDATE_NONE)
 {
 }
 
@@ -148,7 +138,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction& tx)
         const CTxOut& txout = tx.vout[i];
         // Match if the filter contains any arbitrary script data element in any scriptPubKey in tx
         // If this matches, also add the specific output that was matched.
-        // This means clients don't have to update the filter themselves when a new relevant tx 
+        // This means clients don't have to update the filter themselves when a new relevant tx
         // is discovered in order to find spending transactions, which avoids round-tripping and race conditions.
         CScript::const_iterator pc = txout.scriptPubKey.begin();
         std::vector<unsigned char> data;
@@ -164,11 +154,11 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction& tx)
                     insert(COutPoint(hash, i));
                 else if ((nFlags & BLOOM_UPDATE_MASK) == BLOOM_UPDATE_P2PUBKEY_ONLY)
                 {
-                    txnouttype type;
                     std::vector<std::vector<unsigned char> > vSolutions;
-                    if (Solver(txout.scriptPubKey, type, vSolutions) &&
-                            (type == TX_PUBKEY || type == TX_MULTISIG))
+                    txnouttype type = Solver(txout.scriptPubKey, vSolutions);
+                    if (type == TX_PUBKEY || type == TX_MULTISIG) {
                         insert(COutPoint(hash, i));
+                    }
                 }
                 break;
             }
@@ -315,7 +305,5 @@ void CRollingBloomFilter::reset()
     nTweak = GetRand(std::numeric_limits<unsigned int>::max());
     nEntriesThisGeneration = 0;
     nGeneration = 1;
-    for (std::vector<uint64_t>::iterator it = data.begin(); it != data.end(); it++) {
-        *it = 0;
-    }
+    std::fill(data.begin(), data.end(), 0);
 }
