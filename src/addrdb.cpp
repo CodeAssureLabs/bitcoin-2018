@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2017 The Bitcoin Core developers
+// Copyright (c) 2009-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,7 +12,7 @@
 #include <random.h>
 #include <streams.h>
 #include <tinyformat.h>
-#include <util.h>
+#include <util/system.h>
 
 namespace {
 
@@ -105,19 +105,18 @@ bool DeserializeFileDB(const fs::path& path, Data& data)
 
 }
 
-CBanDB::CBanDB()
+CBanDB::CBanDB(fs::path ban_list_path) : m_ban_list_path(std::move(ban_list_path))
 {
-    pathBanlist = GetDataDir() / "banlist.dat";
 }
 
 bool CBanDB::Write(const banmap_t& banSet)
 {
-    return SerializeFileDB("banlist", pathBanlist, banSet);
+    return SerializeFileDB("banlist", m_ban_list_path, banSet);
 }
 
 bool CBanDB::Read(banmap_t& banSet)
 {
-    return DeserializeFileDB(pathBanlist, banSet);
+    return DeserializeFileDB(m_ban_list_path, banSet);
 }
 
 CAddrDB::CAddrDB()

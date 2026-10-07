@@ -1,12 +1,11 @@
-// Copyright (c) 2011-2017 The Bitcoin Core developers
+// Copyright (c) 2011-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_QT_SPLASHSCREEN_H
 #define BITCOIN_QT_SPLASHSCREEN_H
 
-#include <functional>
-#include <QSplashScreen>
+#include <QWidget>
 
 #include <memory>
 
@@ -37,8 +36,8 @@ protected:
     void closeEvent(QCloseEvent *event);
 
 public Q_SLOTS:
-    /** Slot to call finish() method as it's not defined as slot */
-    void slotFinish(QWidget *mainWin);
+    /** Hide the splash screen window and schedule the splash screen object for deletion */
+    void finish();
 
     /** Show message and progress */
     void showMessage(const QString &message, int alignment, const QColor &color);
