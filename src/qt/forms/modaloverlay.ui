@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>ModalOverlay</class>
- <widget class="ModalOverlay" name="ModalOverlay">
+ <widget class="QWidget" name="ModalOverlay">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -271,16 +271,6 @@ QLabel { color: rgb(40,40,40);  }</string>
                </property>
               </widget>
              </item>
-             <item>
-              <widget class="QProgressBar" name="progressBar">
-               <property name="value">
-                <number>24</number>
-               </property>
-               <property name="format">
-                <string/>
-               </property>
-              </widget>
-             </item>
             </layout>
            </item>
            <item row="4" column="0">
@@ -351,6 +341,9 @@ QLabel { color: rgb(40,40,40);  }</string>
              <property name="text">
               <string>Hide</string>
              </property>
+             <property name="shortcut">
+              <string>Esc</string>
+             </property>
              <property name="focusPolicy">
               <enum>Qt::StrongFocus</enum>
              </property>
@@ -369,14 +362,6 @@ QLabel { color: rgb(40,40,40);  }</string>
    </item>
   </layout>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>ModalOverlay</class>
-   <extends>QWidget</extends>
-   <header>qt/modaloverlay.h</header>
-   <container>1</container>
-  </customwidget>
- </customwidgets>
  <resources/>
  <connections/>
 </ui>
