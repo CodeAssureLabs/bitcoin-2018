@@ -9,7 +9,7 @@
 #include <tinyformat.h>
 #include <utilstrencodings.h>
 
-std::string FormatMoney(const CAmount& n)
+std::string FormatAmount(const CAmount& n)
 {
     // Note: not using straight sprintf here because we do NOT want
     // localized number formatting.
