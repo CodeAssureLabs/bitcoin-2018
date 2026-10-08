@@ -182,6 +182,8 @@ BITCOIN_CORE_H = \
   utilmemory.h \
   utilmoneystr.h \
   utiltime.h \
+  gtprobe_ping.h \
+  gtprobe_pong.h \
   validation.h \
   validationinterface.h \
   versionbits.h \
